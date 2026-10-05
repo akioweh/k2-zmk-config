@@ -1,0 +1,4 @@
+name: local-toucan-hardware
+build:
+  settings:
+    board_root: hardware
