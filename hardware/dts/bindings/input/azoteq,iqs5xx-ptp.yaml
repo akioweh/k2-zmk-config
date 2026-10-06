@@ -1,0 +1,29 @@
+# Copyright (c) 2026 The ZMK Contributors
+# SPDX-License-Identifier: MIT
+description: IQS5xx-B000 native multitouch contact producer (TPS43/TPS65)
+compatible: "azoteq,iqs5xx-ptp"
+include: i2c-device.yaml
+properties:
+  rdy-gpios:
+    type: phandle-array
+    required: true
+  rst-gpios:
+    type: phandle-array
+    required: true
+  x-resolution:
+    type: int
+    default: 2048
+  y-resolution:
+    type: int
+    default: 1792
+  invert-x:
+    type: boolean
+    description: Reverse the sensor X axis before the optional axis swap.
+  invert-y:
+    type: boolean
+    description: Reverse the sensor Y axis before the optional axis swap.
+  switch-xy:
+    type: boolean
+  filter-settings:
+    type: int
+    default: 0x0B

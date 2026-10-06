@@ -48,38 +48,16 @@
     pinctrl-names = "default", "sleep";
 
     tps43_trackpad: trackpad@74 {
-        compatible = "azoteq,tps43";
+        compatible = "azoteq,iqs5xx-ptp";
         reg = <0x74>;
         status = "okay";
 
         rst-gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
         rdy-gpios = <&gpio0 2 GPIO_ACTIVE_HIGH>;
 
-        enable-power-management;
-        // idle-sleep; // provides maximal power savings but when ZMK is idle (i.e. you haven't used keyboard in 30secs) the touchpad will not work.  not recommended.
-        // timeout-lp1 = <3>; // 60s timeout before entering lp2 state (20 secs per unit) (default was 20s)
-        report-rate-lp2 = <640>; // 640ms report rate in LP2 state means 55uA draw rather than default 160ms 174uA draw
-        scroll-angle = <30>; // The default angle (about 47 deg) is too big on toucan2 I think
-        sensitivity = <100>;
-        scroll-sensitivity = <100>;
-
-        filter-settings=<0x0B>;
-        hold-time = <500>;
-
-        zoom;
-        scroll;
-        two-finger-tap;
-        single-tap;
-        press-and-hold;
-        //swipes;
-        three-finger-swipe;
-        three-finger-swipe-throttle-ms = <1200>;
+        x-resolution = <2048>;
+        y-resolution = <1792>;
+        filter-settings = <0x0B>;
         switch-xy;
-        invert-scroll-y;
-
     };
-};
-
-&trackpad_split {
-    device = <&tps43_trackpad>;
 };

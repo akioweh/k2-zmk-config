@@ -1,0 +1,13 @@
+config ZMK_TRACKPAD_IQS5XX
+    bool "IQS5xx-B000 contact producer"
+    default y
+    depends on ZMK_TRACKPAD && DT_HAS_AZOTEQ_IQS5XX_PTP_ENABLED && I2C && !ZMK_PTP_TEST_SOURCE
+    help
+      Native contacts only. No firmware mouse gestures or input listener.
+      Factory electrode mapping/tuning is preserved.
+
+config ZMK_IQS5XX_WORKQUEUE_STACK_SIZE
+    int "IQS5xx sampling workqueue stack size"
+    depends on ZMK_TRACKPAD_IQS5XX
+    range 1024 8192
+    default 1536

@@ -1,0 +1,1 @@
+target_sources_ifdef(CONFIG_ZMK_TRACKPAD_IQS5XX app PRIVATE iqs5xx.c)
