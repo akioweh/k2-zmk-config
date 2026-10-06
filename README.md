@@ -25,7 +25,7 @@ cd .build
 
 uv run west build \
   zmk/app -d build/left -b xiao_ble//zmk -- \
-  '-DSHIELD=toucan_left rgbled_adapter nice_view' \
+  '-DSHIELD=toucan_left rgbled_adapter' \
   "-DZMK_CONFIG=$config_repo/config" \
   "-DZMK_EXTRA_MODULES=$config_repo"
 
