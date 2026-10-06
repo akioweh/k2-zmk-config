@@ -37,12 +37,12 @@ layers:
   - .
   - {t: /, h: RSHFT, s: /}
   - RCTRL
-  - LEFT GUI
+  - '&alt_tab'
   - SPACE
   - nav
   - num
   - RET
-  - LALT
+  - system_functions
   system_functions:
   - BT CLR
   - ''
@@ -85,7 +85,7 @@ layers:
   - ''
   - ''
   - ''
-  - ''
+  - {type: held}
   num:
   - '`'
   - '&'
@@ -384,7 +384,7 @@ layers:
   - C
   - SPACE
   - mc_2
-  - {t: ▽, type: trans}
+  - {t: base, h: toggle}
   - RET
   - {t: ▽, type: trans}
   mc_2:
