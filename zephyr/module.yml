@@ -1,4 +1,7 @@
 name: local-toucan-hardware
 build:
+  cmake: .
+  kconfig: hardware/drivers/iqs5xx/Kconfig
   settings:
     board_root: hardware
+    dts_root: hardware

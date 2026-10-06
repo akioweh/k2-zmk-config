@@ -72,7 +72,13 @@ uv run --no-project --python '3.14+gil' --with keymap-drawer==0.23.0 \
 - `config/toucan.conf`
 - `config/toucan.json`: paste into Keymap Editor as layout data
 - `hardware/boards/shields/toucan/`: local hardware definitions and defaults
+- [hardware/drivers/iqs5xx/](hardware/drivers/iqs5xx/README.md): native trackpad driver and build options
 - `west.yml`: firmware and external module pins
+
+### ZMK Fork
+
+`west.yml` pins [my ZMK fork](https://github.com/akioweh/zmk).
+It contains changes to enable multitouch precision touchpad support.
 
 ## License
 

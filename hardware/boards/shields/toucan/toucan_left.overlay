@@ -57,11 +57,3 @@ nice_view_spi: &spi0 {
     , <&gpio1 12 GPIO_ACTIVE_HIGH>
     ;
 };
-
-&trackpad_listener {
-    status = "okay";
-};
-
-&zip_zoom_mapper {
-    status = "okay";
-};
