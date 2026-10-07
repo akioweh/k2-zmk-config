@@ -5,6 +5,11 @@
 //#define TOUCAN_WIN_MODE
 
 / {
+    ptp_touch: ptp_touch {
+        compatible = "zmk,ptp-touch";
+        status = "disabled";
+    };
+
     chosen {
         zmk,kscan = &kscan0;
         zmk,physical-layout = &default_layout;
