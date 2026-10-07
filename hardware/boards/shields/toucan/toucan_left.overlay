@@ -43,6 +43,10 @@ nice_view_spi: &spi0 {
     };
 };
 
+&ptp_touch {
+    status = "okay";
+};
+
 &xiao_i2c {
     status = "disabled";
 };
