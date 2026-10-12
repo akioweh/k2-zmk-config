@@ -78,9 +78,9 @@ uv run --no-project --python '3.14+gil' --with keymap-drawer==0.23.0 \
 
 ### ZMK Fork
 
-`west.yml` pins [my ZMK fork](https://github.com/akioweh/zmk).
+`west.yml` pins [my ZMK fork](https://github.com/akioweh/zmk/tree/feat/ptp-core).
 It contains changes to enable multitouch precision touchpad support.
-There is a `zmk,ptp-touch` input bridge indicating when the trackpad is in use.
+There is also a `zmk,ptp-touch` input bridge indicating when the trackpad is in use.
 (This is used to auto-activate the mouse layer.)
 
 ## License
