@@ -61,28 +61,3 @@ Zephyr module and use the fork's public `zmk/ptp.h` producer API and bounded
 The driver's `CMakeLists.txt` and `Kconfig` live alongside the implementation;
 the root CMake file includes this directory, and `zephyr/module.yml` points
 directly to its Kconfig.
-
-## Checks
-
-From the repository root after setup:
-
-```sh
-cd .build
-ZEPHYR_TOOLCHAIN_VARIANT=host uv run west build ../tests/iqs5xx \
-  -d build/iqs5xx-tests -b native_sim/native/64
-build/iqs5xx-tests/zephyr/zephyr.exe
-```
-
-The tests cover contact decoding, IRQ scheduling, split forwarding, fault recovery
-and device-PM suspend/resume using emulated I²C/GPIO. They reject sample reads
-with RDY low and check scan-time wrap during a slow read, timestamp retention
-through stalled output, and continued window service/ordered births and lifts
-under backpressure, including transition overflow during in-flight submission
-and partially failed suspend cancellation.
-The `no-pm.conf` variant also checks operation with device PM disabled.
-They default to the pinned `.build/zmk` checkout. For development, add
-`-DZMK_SOURCE="$PWD/../zmk"` after `--` in the build command.
-
-The fork's generic core/split suites remain in `zmk/app/tests/ptp`.
-These tests do not measure radio throughput, power consumption or host sleep/wake
-behavior.
