@@ -13,16 +13,28 @@ sensor axes before swapping. Match the resulting ranges on both halves and
 measure the active physical surface for the host dimensions. Factory sensing,
 palm and low-power settings are retained, while firmware gestures are disabled.
 
-A dedicated preemptible workqueue isolates IRQ sampling and 50 ms active polling
-from keyboard/USB system-workqueue stalls. Its stack defaults to 1536 bytes
-(`CONFIG_ZMK_IQS5XX_WORKQUEUE_STACK_SIZE`). Sensor scan rates are unchanged.
-Palms, resets, malformed samples and I²C failures mark previous contacts unconfident
-before lifting; configuration retries without blocking key processing.
-Window termination is checked, and controller resets trigger retuning; ordinary
-communication recovery retains calibration.
-Peripheral backpressure refreshes held observations so an offline lift is cached,
-while pending contact/button/confidence changes and lifts/cancellations remain
-barriers before slot reuse. This also preserves births during heartbeat contention.
+A dedicated preemptible workqueue isolates RDY-synchronized sampling from
+keyboard/USB system-workqueue stalls. Its stack defaults to 1536 bytes
+(`CONFIG_ZMK_IQS5XX_WORKQUEUE_STACK_SIZE`). RDY's rising edge captures monotonic
+uptime ticks; every contact in that window retains that scan-completion timestamp
+in wrapping 100 µs units through output retries, split forwarding and HID. The
+10 ms active/idle-touch intervals are sensor targets, not synthesized timestamps.
+A 50 ms active watchdog checks RDY's level without forcing sample reads; a missed
+edge falls back to acquisition time because the original completion time is unknown.
+Setup/recovery/PM can force I²C communication (including the documented wake NACK
+retry), but failed sample reads are not retried against a different window.
+
+Acquisition reads/closes each window independently of transport admission. A
+four-entry output queue on the system workqueue preserves contact transitions and
+coalesces adjacent motion. Output stalls cannot hold the hardware window open.
+Overflow discards incomplete history, cancels admitted/attempted lifetimes with
+unconfident contacts and a lift, then recovers from buffered fresh observations.
+Palms, resets, malformed samples and I²C failures also cancel before lifting;
+configuration retries without blocking key processing. Window termination is
+checked, and controller resets trigger retuning; ordinary communication recovery
+retains calibration. Event-mode stationary contacts do not manufacture fresh
+scans: RDY-level checks alone cannot diagnose a sensor that silently stops
+responding without raising RDY. Split heartbeats are transport leases, not scans.
 Basic touchpad operation is confirmed on Toucan. Calibration, other controller
 revisions and power behavior still need hardware checks.
 
@@ -44,7 +56,8 @@ unchanged. Battery current and wake latency require physical validation.
 
 The implementation and decoder are `iqs5xx.c` and `iqs5xx.h`; the binding is
 [`azoteq,iqs5xx-ptp.yaml`](../../dts/bindings/input/azoteq,iqs5xx-ptp.yaml). They are built by this repository's
-Zephyr module and depend only on the fork's public `zmk/ptp.h` producer API.
+Zephyr module and use the fork's public `zmk/ptp.h` producer API and bounded
+`zmk/ptp/queue.h` queue helper.
 The driver's `CMakeLists.txt` and `Kconfig` live alongside the implementation;
 the root CMake file includes this directory, and `zephyr/module.yml` points
 directly to its Kconfig.
@@ -61,8 +74,11 @@ build/iqs5xx-tests/zephyr/zephyr.exe
 ```
 
 The tests cover contact decoding, IRQ scheduling, split forwarding, fault recovery
-and device-PM suspend/resume using emulated I²C/GPIO. They also check sampling
-during a stalled system workqueue and retained births under backpressure.
+and device-PM suspend/resume using emulated I²C/GPIO. They reject sample reads
+with RDY low and check scan-time wrap during a slow read, timestamp retention
+through stalled output, and continued window service/ordered births and lifts
+under backpressure, including transition overflow during in-flight submission
+and partially failed suspend cancellation.
 The `no-pm.conf` variant also checks operation with device PM disabled.
 They default to the pinned `.build/zmk` checkout. For development, add
 `-DZMK_SOURCE="$PWD/../zmk"` after `--` in the build command.
