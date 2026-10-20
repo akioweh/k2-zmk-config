@@ -36,7 +36,7 @@ layers:
   - ','
   - .
   - {t: /, h: RSHFT, s: /}
-  - RCTRL
+  - {t: '&caps_word', s: CAPS}
   - '&alt_tab'
   - SPACE
   - nav
