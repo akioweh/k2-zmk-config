@@ -282,7 +282,8 @@ path.combo { stroke: #7f7f7f; }
 </g>
 <g transform="translate(820, 175)" class="key keypos-35">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
-<text x="0" y="0" class="key tap">RCTRL</text>
+<text x="0" y="0" class="key tap"><tspan style="font-size: 70%">&amp;caps_word</tspan></text>
+<text x="0" y="-21" class="key shifted">CAPS</text>
 </g>
 <g transform="translate(226, 201) rotate(-5.0)" class="key keypos-36">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
