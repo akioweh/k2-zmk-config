@@ -1836,15 +1836,19 @@ path.combo { stroke: #7f7f7f; }
 </g>
 <g transform="translate(79, 125)" class="key keypos-13">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
+<text x="0" y="0" class="key tap">LGUI</text>
 </g>
 <g transform="translate(132, 89)" class="key keypos-14">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
+<text x="0" y="0" class="key tap">LALT</text>
 </g>
 <g transform="translate(185, 75)" class="key keypos-15">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
+<text x="0" y="0" class="key tap">LSHIFT</text>
 </g>
 <g transform="translate(238, 89)" class="key keypos-16">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
+<text x="0" y="0" class="key tap">LCTRL</text>
 </g>
 <g transform="translate(291, 95)" class="key keypos-17">
 <rect rx="6" ry="6" x="-24" y="-23" width="49" height="46" class="key"/>
