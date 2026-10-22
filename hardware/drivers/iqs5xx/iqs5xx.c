@@ -49,7 +49,9 @@ struct data {
     struct zmk_ptp_frame frame, attempted, accepted;
     uint32_t ticket, output_epoch;
     uint16_t cancel_time;
-    bool cancel_pending, lifting, configured;
+    bool cancel_pending, lifting, configured, closing;
+    struct iqs5xx_diagnostics diagnostics;
+    int64_t last_sample_ticks, last_log_ms;
 };
 
 static int read_reg(const struct config *cfg, uint16_t reg, void *bytes, size_t size) {
@@ -77,10 +79,15 @@ static int write_reg(const struct config *cfg, uint16_t reg, uint16_t value, boo
 
 static int close_window(const struct config *cfg) {
     /* Datasheet 8.7: address 0xEEEE, one arbitrary data byte, then STOP. */
-    return write_reg(cfg, 0xeeee, 0, false);
+    int err = write_reg(cfg, 0xeeee, 0, false);
+    if (!err) {
+        /* Allow the controller to deassert RDY before checking pin level. */
+        k_busy_wait(75);
+    }
+    return err;
 }
 
-static int set_suspend(const struct config *cfg, bool suspend) {
+static int write_suspend(const struct config *cfg, bool suspend) {
     uint8_t control;
     int err = read_reg(cfg, 0x0432, &control, 1);
     if (!err) {
@@ -89,14 +96,13 @@ static int set_suspend(const struct config *cfg, bool suspend) {
         control = suspend ? control | BIT(0) : control & ~BIT(0);
         err = write_reg(cfg, 0x0432, control, false);
     }
-    int end = close_window(cfg);
-    return err ? err : end;
+    return err;
 }
 
 static int configure(const struct config *cfg) {
     uint8_t product[2], xy, status;
-    /* Also recover from an interrupted/failed PM transition. */
-    int err = set_suspend(cfg, false);
+    /* Also recover from an interrupted/failed PM transition in one window. */
+    int err = write_suspend(cfg, false);
     if (err) {
         return err;
     }
@@ -129,7 +135,7 @@ static int configure(const struct config *cfg) {
         uint16_t reg, value;
         bool wide;
     } settings[] = {
-        {0x058f, BIT(0) | BIT(2) | BIT(3) | BIT(6), false}, /* Event mode, XY, re-ATI, touch */
+        {0x058f, BIT(0) | BIT(2), false}, /* Event mode, trackpad XY/finger transitions */
         {0x0669, (xy & ~7) | (cfg->invert_x ? BIT(0) : 0) | (cfg->invert_y ? BIT(1) : 0), false},
         {0x066a, CONFIG_ZMK_TRACKPAD_FINGERS, false},
         {0x066e, cfg->x, true},
@@ -137,10 +143,10 @@ static int configure(const struct config *cfg) {
         {0x0632, cfg->filter, false},
         {0x06b7, 0, false},
         {0x06b8, 0, false}, /* No firmware gestures. */
-        {0x057a, 10, true},
-        {0x057c, 10, true},
-        {0x0582, 640, true},                       /* Preserve the board's low-power idle rate. */
-        {0x058e, BIT(6) | BIT(5) | BIT(2), false}, /* Setup, watchdog, re-ATI */
+        {0x057a, 13, true},
+        {0x057c, 13, true},
+        {0x0582, 640, true},                                 /* Preserve the board's low-power idle rate. */
+        {0x058e, BIT(6) | BIT(5) | BIT(3) | BIT(2), false}, /* Setup, watchdog, ALP/TP re-ATI */
     };
     for (size_t i = 0; i < ARRAY_SIZE(settings); i++) {
         err = write_reg(cfg, settings[i].reg, settings[i].value, settings[i].wide);
@@ -181,7 +187,10 @@ static void enqueue(struct data *data, const struct zmk_ptp_frame *frame) {
         .state = zmk_ptp_frame_state(frame),
         .motion = zmk_ptp_frame_state(frame) == zmk_ptp_frame_state(&data->frame),
     };
-    if (zmk_ptp_queue_put(&observations, &item, &scratch) < 0) {
+    int result = zmk_ptp_queue_put(&observations, &item, &scratch);
+    data->diagnostics.motion_coalesced += result == 1;
+    if (result < 0) {
+        data->diagnostics.overflows++;
         k_msgq_purge(&observations);
         data->output_epoch++;
         data->cancel_pending = true;
@@ -236,10 +245,39 @@ static void output(struct k_work *work) {
     k_mutex_unlock(&data->send_lock);
 }
 
+static void note_fault(uint32_t *count, const char *name, int err) {
+    ++*count;
+    if ((*count & (*count - 1)) == 0) {  // re-report every power-of-two
+        LOG_WRN("%s: %d (total %u)", name, err, *count);
+    }
+}
+
 static void sample(struct data *data) {
     const struct config *cfg = data->dev->config;
     uint8_t sample[IQS5XX_SAMPLE_SIZE];
     int err;
+    if (data->closing) {
+        /* The last snapshot may still be retained. Discard that window, rather
+         * than replaying it or rewriting settings after a bus fault. */
+        k_spinlock_key_t key = k_spin_lock(&data->window_lock);
+        data->window_valid = false;
+        k_spin_unlock(&data->window_lock, key);
+        atomic_set(&data->acquiring, 1);
+        /* RDY low means the ASIC already expired the failed window. Do not
+         * force a new low-power window just to close it again. */
+        err = gpio_pin_get_dt(&cfg->ready);
+        if (err > 0) {
+            err = close_window(cfg);
+        }
+        if (err) {
+            atomic_clear(&data->acquiring);
+            note_fault(&data->diagnostics.close_errors, "Window close", err);
+            k_work_reschedule_for_queue(&sample_queue, &data->work, K_MSEC(50));
+        } else {
+            data->closing = false;
+        }
+        return;
+    }
     if (!data->configured) {
         atomic_clear(&data->acquiring);
         k_spinlock_key_t key = k_spin_lock(&data->window_lock);
@@ -260,6 +298,7 @@ static void sample(struct data *data) {
             return;
         }
         data->configured = true;
+        return;
     }
     /* Normal sampling never forces a window. A level check also catches a
      * missed edge; it cannot recover the original scan-completion time. */
@@ -272,6 +311,7 @@ static void sample(struct data *data) {
         }
         return;
     }
+    data->diagnostics.timestamp_fallbacks += !data->window_valid;
     int64_t ticks = data->window_valid ? data->window_ticks : k_uptime_ticks();
     data->window_valid = false;
     k_spin_unlock(&data->window_lock, key);
@@ -280,14 +320,41 @@ static void sample(struct data *data) {
      * that new scan would no longer belong to the captured RDY timestamp. */
     uint8_t address[] = {0x00, 0x0f};
     err = i2c_write_read_dt(&cfg->bus, address, sizeof(address), sample, sizeof(sample));
+    if (err) {
+        note_fault(&data->diagnostics.read_errors, "Sample read", err);
+    } else {
+        struct iqs5xx_diagnostics *d = &data->diagnostics;
+        d->samples++;
+        d->status0 = sample[0];
+        d->status1 = sample[1];
+        if (sample[0] & BIT(3)) {
+            note_fault(&d->ati_error_samples, "Sensor ATI error", sample[0]);
+        }
+        if (sample[1] & BIT(3)) {
+            note_fault(&d->missed_rate_samples, "Sensor report-rate miss", sample[1]);
+        }
+    }
     int end = close_window(cfg);
+    if (end) {
+        note_fault(&data->diagnostics.close_errors, "Window close", end);
+        data->closing = true;
+        atomic_clear(&data->acquiring);
+    }
     err = err ? err : end;
     struct zmk_ptp_frame frame;
+    bool reset = false;
     if (!err) {
         err = iqs5xx_decode(sample, cfg->x, cfg->y, cfg->swap, &frame);
+        reset = err == -EPIPE;
+        if (err == -EINVAL) {
+            note_fault(&data->diagnostics.invalid_samples, "Invalid snapshot", err);
+        }
     }
     if (err) {
-        if (err != -ECANCELED) {
+        if (reset) {
+            /* Only a reported controller reset invalidates its configuration.
+             * Ordinary I2C faults do not request setup, reseed or calibration. */
+            note_fault(&data->diagnostics.resets, "Controller reset", err);
             data->configured = false;
             atomic_clear(&data->acquiring);
         }
@@ -306,6 +373,22 @@ static void sample(struct data *data) {
         k_work_schedule_for_queue(&sample_queue, &data->work, K_MSEC(data->configured ? 50 : 250));
         return;
     }
+    if (data->frame.contact_count && frame.contact_count) {
+        data->diagnostics.last_gap_us =
+            k_ticks_to_us_floor64(ticks - data->last_sample_ticks);
+        data->diagnostics.max_gap_us = MAX(data->diagnostics.max_gap_us,
+                                          data->diagnostics.last_gap_us);
+    }
+    data->last_sample_ticks = ticks;
+    if (IS_ENABLED(CONFIG_LOG) && k_uptime_get() - data->last_log_ms >= 5000) {
+        const struct iqs5xx_diagnostics *d = &data->diagnostics;
+        LOG_INF("samples=%u gap_us=%u max_gap_us=%u read=%u close=%u invalid=%u "
+                "reset=%u ati=%u rr=%u fallback=%u coalesced=%u overflow=%u",
+                d->samples, d->last_gap_us, d->max_gap_us, d->read_errors, d->close_errors,
+                d->invalid_samples, d->resets, d->ati_error_samples, d->missed_rate_samples,
+                d->timestamp_fallbacks, d->motion_coalesced, d->overflows);
+        data->last_log_ms = k_uptime_get();
+    }
     frame.scan_time = time;
     enqueue(data, &frame);
     if (frame.contact_count) {
@@ -323,7 +406,7 @@ static void work(struct k_work *item) {
         sample(data);
         /* Service a window arriving during the read/close without bypassing
          * recovery backoff. Its IRQ has already captured its own timestamp. */
-        if (data->configured && gpio_pin_get_dt(&cfg->ready) > 0) {
+        if (data->configured && !data->closing && gpio_pin_get_dt(&cfg->ready) > 0) {
             k_work_reschedule_for_queue(&sample_queue, &data->work, K_NO_WAIT);
         }
     }
@@ -342,6 +425,12 @@ static void ready(const struct device *port, struct gpio_callback *cb, uint32_t 
 }
 
 #if IS_ENABLED(CONFIG_PM_DEVICE)
+static int set_suspend(const struct config *cfg, bool suspend) {
+    int err = write_suspend(cfg, suspend);
+    int end = close_window(cfg);
+    return err ? err : end;
+}
+
 static bool cleanup_failed(int err) {
     /* Peripherals cache physical observations despite transport errors. A local
      * host producer must not emit a confident lift after failed cancellation. */
@@ -406,12 +495,15 @@ static int pm_action(const struct device *dev, enum pm_device_action action) {
         err = set_suspend(cfg, action == PM_DEVICE_ACTION_SUSPEND);
     }
     if (action == PM_DEVICE_ACTION_RESUME || err) {
-        if (err && action == PM_DEVICE_ACTION_SUSPEND) {
-            /* PM keeps the device active on failure. Resume/reconfigure it. */
-            set_suspend(cfg, false);
+        if (err && action == PM_DEVICE_ACTION_SUSPEND && set_suspend(cfg, false)) {
+            /* Only a failed rollback needs forced wake/setup recovery. */
+            data->configured = false;
         }
-        data->configured = false;
+        /* Suspend retains settings; the ASIC reseeds automatically on wake.
+         * A subsequent SHOW_RESET snapshot handles any actual controller reset. */
+        data->closing = false;
         if (!err || action == PM_DEVICE_ACTION_SUSPEND) {
+            atomic_set(&data->acquiring, data->configured);
             int irq = gpio_pin_interrupt_configure_dt(&cfg->ready, GPIO_INT_EDGE_TO_ACTIVE);
             if (!irq) {
                 atomic_clear(&data->paused);
@@ -495,3 +587,17 @@ static int init(const struct device *dev) {
 BUILD_ASSERT(CONFIG_ZMK_TRACKPAD_FINGERS == 5, "IQS5xx uses five stable hardware slots");
 BUILD_ASSERT(DT_NUM_INST_STATUS_OKAY(DT_DRV_COMPAT) == 1, "One logical touchpad is supported");
 DT_INST_FOREACH_STATUS_OKAY(INSTANCE)
+
+int iqs5xx_get_diagnostics(struct iqs5xx_diagnostics *out) {
+    if (!out) {
+        return -EINVAL;
+    }
+    if (k_is_in_isr()) {
+        return -EWOULDBLOCK;
+    }
+    struct data *data = DEVICE_DT_INST_GET(0)->data;
+    k_mutex_lock(&data->lock, K_FOREVER);
+    *out = data->diagnostics;
+    k_mutex_unlock(&data->lock);
+    return 0;
+}

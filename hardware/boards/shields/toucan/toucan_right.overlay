@@ -57,7 +57,7 @@
 
         x-resolution = <2048>;
         y-resolution = <1792>;
-        filter-settings = <0x0B>;
+        filter-settings = <0x0B>;  // Default (moving avg + dynamic IIR filter)
         switch-xy;
     };
 };
