@@ -11,6 +11,18 @@
 /* IQS5xx-B000: 0x000F..0x0038, five stable seven-byte finger slots (5.2.6). */
 #define IQS5XX_SAMPLE_SIZE 42
 
+/* Cumulative observations, not a claim about the ASIC's internal scan rate. */
+struct iqs5xx_diagnostics {
+    uint32_t samples, read_errors, close_errors, invalid_samples, resets;
+    uint32_t ati_error_samples, missed_rate_samples, timestamp_fallbacks;
+    uint32_t motion_coalesced, overflows;
+    uint32_t last_gap_us, max_gap_us;
+    uint8_t status0, status1;
+};
+
+/* Thread-only snapshot for the single configured sensor; counters are not reset. */
+int iqs5xx_get_diagnostics(struct iqs5xx_diagnostics *out);
+
 static inline int iqs5xx_decode(const uint8_t sample[IQS5XX_SAMPLE_SIZE], uint16_t max_x,
                                 uint16_t max_y, bool swap, struct zmk_ptp_frame *frame) {
     *frame = (struct zmk_ptp_frame){0};

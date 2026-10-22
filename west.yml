@@ -2,7 +2,7 @@ manifest:
   projects:
     - name: zmk
       url: https://github.com/akioweh/zmk
-      revision: b2e08265f146bbd00ef5f065b49dfa89e9d6eee8
+      revision: 2863ff5a69961fdbef7cea1c14cadbdea47455f8
       import: app/west.yml
     - name: zmk-rgbled-widget
       url: https://github.com/caksoylar/zmk-rgbled-widget
