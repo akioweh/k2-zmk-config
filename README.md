@@ -85,9 +85,9 @@ There is also a `zmk,ptp-touch` input bridge indicating when the trackpad is in 
 
 ## License
 
-Original contributions: [MIT](LICENSE), © 2026 akioweh.
+Original contributions are [MIT](LICENSE).
 
-Upstream MIT material:
+This repo also contains some upstream material, all MIT:
 
-- Toucan hardware and Keymap Editor layout: [beekeeb](https://github.com/beekeeb/zmk-keyboard-toucan2), with its [original license](hardware/boards/shields/toucan/LICENSE).
-- SVG styling: [keymap-drawer](https://github.com/caksoylar/keymap-drawer), with its [original license](keymap-drawer/LICENSE).
+- Toucan shield definitions and Keymap Editor layout: [beekeeb](https://github.com/beekeeb/zmk-keyboard-toucan2), with its [original license](hardware/boards/shields/toucan/LICENSE).
+- Keymap SVG styling: [keymap-drawer](https://github.com/caksoylar/keymap-drawer), with its [original license](keymap-drawer/LICENSE).
