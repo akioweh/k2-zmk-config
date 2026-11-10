@@ -4,49 +4,21 @@ For the Toucan 2, with a keymap that is largely the same as [my Kyria](https://g
 
 ![Toucan keymap](keymap-drawer/toucan.svg)
 
-## Compilation
+## Building
 
-Install Git, CMake, Ninja, [uv](https://docs.astral.sh/uv/getting-started/installation/), and [Zephyr SDK 0.17.0](https://zmk.dev/docs/development/local-toolchain/setup/native).
+This repo is designed for local compilation.
 
-In this repo (root), run:
+Core reqs:
 
-```sh
-./setup.sh
-```
+- Git, CMake, Ninja
+- [Zephyr SDK 0.17.0](https://zmk.dev/docs/development/local-toolchain/setup/native)
+- [`just`](https://github.com/casey/just)
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/)
 
-(Rerun after changing `west.yml`.)
-
-### First build
-
-```sh
-export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-config_repo="$PWD"
-cd .build
-
-uv run west build \
-  zmk/app -d build/left -b xiao_ble//zmk -- \
-  '-DSHIELD=toucan_left rgbled_adapter' \
-  "-DZMK_CONFIG=$config_repo/config" \
-  "-DZMK_EXTRA_MODULES=$config_repo"
-
-uv run west build \
-  zmk/app -d build/right -b xiao_ble//zmk -- \
-  '-DSHIELD=toucan_right rgbled_adapter' \
-  "-DZMK_CONFIG=$config_repo/config" \
-  "-DZMK_EXTRA_MODULES=$config_repo"
-```
-
-Add `-p` to these commands for pristine (re)builds.
-
-### Subsequent builds
-
-(Once build dirs are generated, the above parameters are cached.)
+`just` provides shortcuts for common commands; run (from repo root) to see list of available recipes:
 
 ```sh
-export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
-cd .build
-uv run west build -d build/left
-uv run west build -d build/right
+just
 ```
 
 ### Outputs
@@ -54,34 +26,14 @@ uv run west build -d build/right
 - `.build/build/left/zephyr/zmk.uf2`
 - `.build/build/right/zephyr/zmk.uf2`
 
-### Keymap Rendering
+## Key thingies
 
-```sh
-uv run --no-project --python '3.14+gil' --with keymap-drawer==0.23.0 \
-  keymap -c keymap_drawer.config.yaml parse -z config/toucan.keymap \
-  > keymap-drawer/toucan.yaml
-uv run --no-project --python '3.14+gil' --with keymap-drawer==0.23.0 \
-  keymap -c keymap_drawer.config.yaml draw \
-  -d hardware/boards/shields/toucan/toucan.dtsi \
-  keymap-drawer/toucan.yaml > keymap-drawer/toucan.svg
-```
-
-## Editing
-
-- `config/toucan.keymap`
-- `config/toucan.conf`
-- `config/toucan.json`: paste into Keymap Editor as layout data
-- `hardware/boards/shields/toucan/`: local hardware definitions and defaults
-- `hardware/display/`: nice!view display
-- [hardware/drivers/iqs5xx/](hardware/drivers/iqs5xx/README.md): native trackpad driver and build options
-- `west.yml`: firmware and external module pins
-
-### ZMK Fork
-
-`west.yml` pins [my ZMK fork](https://github.com/akioweh/zmk/tree/feat/ptp-core).
-It contains changes to enable multitouch precision touchpad support.
-There is also a `zmk,ptp-touch` input bridge indicating when the trackpad is in use.
-(This is used to auto-activate the mouse layer.)
+- [`config/toucan.json`](config/toucan.json): layout data for [Keymap Editor](https://nickcoutsos.github.io/keymap-editor/)
+- [`hardware/drivers/iqs5xx/`](hardware/drivers/iqs5xx/README.md): native trackpad driver and build options
+- [`west.yml`](west.yml) pins [my fork of ZMK](https://github.com/akioweh/zmk/tree/feat/ptp-core).
+  It contains changes to enable multitouch precision touchpad support.
+  There is also a `zmk,ptp-touch` input bridge indicating when the trackpad is in use.
+  (This is used to auto-activate the mouse layer.)
 
 ## License
 
