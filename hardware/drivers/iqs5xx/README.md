@@ -37,9 +37,10 @@ Palms, resets, malformed samples and I²C failures also cancel before lifting;
 only a controller reset reruns configuration and requests tuning. An ordinary
 read failure resumes at the next RDY window. Failed termination retries only the
 close command every 50 ms and discards the retained sample, without rewriting
-settings or requesting calibration. Setup failures retry after 250 ms. Event-mode stationary contacts do not manufacture fresh
-scans: RDY-level checks alone cannot diagnose a sensor that silently stops
-responding without raising RDY. Split heartbeats are transport leases, not scans.
+settings or requesting calibration. Setup failures retry after 250 ms.
+Streaming mode keeps reporting stationary contacts at the active/idle-touch
+interval: PTP hosts can interpret silence as a lost lift. Only actual RDY windows
+produce scans; split heartbeats are transport leases, not scans.
 Basic touchpad operation is confirmed on Toucan. Calibration, other controller
 revisions and power behavior still need hardware checks.
 
@@ -49,8 +50,8 @@ revisions and power behavior still need hardware checks.
 failure, malformed snapshot, reset, ATI-error/report-rate-miss, timestamp fallback,
 and acquisition coalescing/overflow counts. It also returns the latest status
 bytes and last/maximum observed gaps between consecutive active snapshots.
-Event-mode stationary holds can produce long gaps; these are not measurements
-of internal scan frequency. ATI-error/report-rate flags are counted per observed
+These gaps measure acquired snapshots, not internal scan frequency.
+ATI-error/report-rate flags are counted per observed
 sample, not per unique incident. They never trigger a host-driven retune loop.
 
 With logging enabled, faults are logged on occurrences 1, 2, 4, 8, … and a

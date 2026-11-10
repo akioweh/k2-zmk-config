@@ -135,7 +135,8 @@ static int configure(const struct config *cfg) {
         uint16_t reg, value;
         bool wide;
     } settings[] = {
-        {0x058f, BIT(0) | BIT(2), false}, /* Event mode, trackpad XY/finger transitions */
+        /* PTP hosts need held-contact reports; event-mode silence causes false lifts. */
+        {0x058f, BIT(2), false}, /* Streaming mode, trackpad XY enabled. */
         {0x0669, (xy & ~7) | (cfg->invert_x ? BIT(0) : 0) | (cfg->invert_y ? BIT(1) : 0), false},
         {0x066a, CONFIG_ZMK_TRACKPAD_FINGERS, false},
         {0x066e, cfg->x, true},
@@ -392,8 +393,7 @@ static void sample(struct data *data) {
     frame.scan_time = time;
     enqueue(data, &frame);
     if (frame.contact_count) {
-        /* Check RDY level, not forced I2C polling. This does not invent scans
-         * for a stationary contact in event mode. */
+        /* Check RDY level without forcing a window or replaying a stale scan. */
         k_work_schedule_for_queue(&sample_queue, &data->work, K_MSEC(50));
     }
 }
